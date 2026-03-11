@@ -11,6 +11,12 @@ function HomePage() {
   const [selectedCampground, setSelectedCampground] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [arrivalTime, setArrivalTime] = useState('12:00');
+  const [wakeUpTime, setWakeUpTime] = useState('08:00');
+  const [bedTime, setBedTime] = useState('22:00');
+  const [morningHikeDays, setMorningHikeDays] = useState(0);
+  const [hikeOnArrivalDay, setHikeOnArrivalDay] = useState(false);
+  const [wantsMorningHikes, setWantsMorningHikes] = useState(false);
   
   async function handleCampgroundSearch(event) {
     setCampgroundSearch(event.target.value);
@@ -27,6 +33,23 @@ function HomePage() {
         setIsLoading(false);
       }
     }
+  }
+
+  function handleArrivalTimeChange(event) {
+  setArrivalTime(event.target.value);
+  }
+
+  function handleWakeUpTimeChange(event) {
+    setWakeUpTime(event.target.value);
+  }
+
+  function handleBedTimeChange(event) {
+    setBedTime(event.target.value);
+  }
+
+  function handleMorningHikeDaysChange(event) {
+    const value = Math.min(Number(event.target.value), numberOfDays - 2);
+    setMorningHikeDays(value);
   }
 
   function handleSheetLinkChange(event) {
@@ -90,6 +113,59 @@ function HomePage() {
         <option value="advanced">Advanced (6-10 miles)</option>
         <option value="pro">Absolute Pro (10+ miles)</option>
     </select>
+
+    <label>Expected Arrival Time (Day 1)</label>
+    <input
+      type="time"
+      value={arrivalTime}
+      onChange={handleArrivalTimeChange}
+    />
+
+    <label>Expected Wake Up Time</label>
+    <input
+      type="time"
+      value={wakeUpTime}
+      onChange={handleWakeUpTimeChange}
+    />
+
+    <label>Expected Bedtime</label>
+    <input
+      type="time"
+      value={bedTime}
+      onChange={handleBedTimeChange}
+    />
+
+    <label>
+      <input
+        type="checkbox"
+        checked={wantsMorningHikes}
+        onChange={(e) => setWantsMorningHikes(e.target.checked)}
+      />
+      I would like morning hikes recommended
+    </label>
+
+    {wantsMorningHikes && (
+      <>
+        <label>Number of Morning Hike Days</label>
+        <small>Morning hikes will not be scheduled on arrival or departure day.</small>
+        <input
+          type="number"
+          min={0}
+          max={numberOfDays - 2}
+          value={morningHikeDays}
+          onChange={handleMorningHikeDaysChange}
+        />
+      </>
+    )}
+
+    <label>
+      <input
+        type="checkbox"
+        checked={hikeOnArrivalDay}
+        onChange={(e) => setHikeOnArrivalDay(e.target.checked)}
+      />
+      I want to hike on my arrival day
+    </label>
 
     <label>Search Campground</label>
     <input
