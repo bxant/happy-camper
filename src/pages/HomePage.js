@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { searchCampgrounds } from '../services/recreationApi';
+import MealInput from '../components/MealInput';
 
 function HomePage() {
-  const [sheetLink, setSheetLink] = useState('');
+  //const [sheetLink, setSheetLink] = useState('');
   const [startDate, setStartDate] = useState('');
   const [numberOfDays, setNumberOfDays] = useState(1);
   const [hikingLevel, setHikingLevel] = useState('beginner');
@@ -17,6 +18,10 @@ function HomePage() {
   const [morningHikeDays, setMorningHikeDays] = useState(0);
   const [hikeOnArrivalDay, setHikeOnArrivalDay] = useState(false);
   const [wantsMorningHikes, setWantsMorningHikes] = useState(false);
+  const [breakfastMeals, setBreakfastMeals] = useState([]);
+  const [lunchMeals, setLunchMeals] = useState([]);
+  const [dinnerMeals, setDinnerMeals] = useState([]);
+  const [validationErrors, setValidationErrors] = useState([]);
   
   async function handleCampgroundSearch(event) {
     setCampgroundSearch(event.target.value);
@@ -33,6 +38,18 @@ function HomePage() {
         setIsLoading(false);
       }
     }
+  }
+
+  function handleAddMeal(mealType, meal) {
+    if (mealType === 'Breakfast') setBreakfastMeals([...breakfastMeals, meal]);
+    if (mealType === 'Lunch') setLunchMeals([...lunchMeals, meal]);
+    if (mealType === 'Dinner') setDinnerMeals([...dinnerMeals, meal]);
+  }
+
+  function handleRemoveMeal(mealType, index) {
+    if (mealType === 'Breakfast') setBreakfastMeals(breakfastMeals.filter((_, i) => i !== index));
+    if (mealType === 'Lunch') setLunchMeals(lunchMeals.filter((_, i) => i !== index));
+    if (mealType === 'Dinner') setDinnerMeals(dinnerMeals.filter((_, i) => i !== index));
   }
 
   function handleArrivalTimeChange(event) {
@@ -52,9 +69,9 @@ function HomePage() {
     setMorningHikeDays(value);
   }
 
-  function handleSheetLinkChange(event) {
-    setSheetLink(event.target.value);
-  }
+  // function handleSheetLinkChange(event) {
+  //   setSheetLink(event.target.value);
+  // }
 
   function handleStartDateChange(event) {
     setStartDate(event.target.value);
@@ -69,15 +86,38 @@ function HomePage() {
   }
 
   function handleSubmit() {
-  console.log('Sheet Link:', sheetLink);
-  console.log('Start Date:', startDate);
-  console.log('Number of Days:', numberOfDays);
-  console.log('Hiking Level:', hikingLevel);
+    const errors = [];
+
+    if (!startDate) errors.push('Please select a trip start date.');
+    if (!selectedCampground) errors.push('Please search and select a campground.');
+    if (breakfastMeals.length === 0) errors.push('Please add at least one breakfast meal.');
+    if (lunchMeals.length === 0) errors.push('Please add at least one lunch meal.');
+    if (dinnerMeals.length === 0) errors.push('Please add at least one dinner meal.');
+
+    if (errors.length > 0) {
+      setValidationErrors(errors);
+      return;
+    }
+
+    setValidationErrors([]);
+    console.log('Start Date:', startDate);
+    console.log('Number of Days:', numberOfDays);
+    console.log('Hiking Level:', hikingLevel);
+    console.log('Campground:', selectedCampground.FacilityName);
+    console.log('Breakfast:', breakfastMeals);
+    console.log('Lunch:', lunchMeals);
+    console.log('Dinner:', dinnerMeals);
   }
+  // function handleSubmit() {
+  // // console.log('Sheet Link:', sheetLink);
+  // console.log('Start Date:', startDate);
+  // console.log('Number of Days:', numberOfDays);
+  // console.log('Hiking Level:', hikingLevel);
+  // }
 
   return (
     <div className="home-page">
-      <h2>Plan Your Trip</h2>
+      {/* <h2>Plan Your Trip</h2>
 
       <label>Google Sheet Link</label>
       <input
@@ -85,7 +125,7 @@ function HomePage() {
         value={sheetLink}
         onChange={handleSheetLinkChange}
         placeholder="Paste your Google Sheet link here"
-      />
+      /> */}
 
       <label>Trip Start Date</label>
       <input
@@ -193,7 +233,35 @@ function HomePage() {
     {isLoading && <p>Searching...</p>}
     {error && <p style={{color: 'red'}}>{error}</p>}
 
-        <button onClick={handleSubmit}>Plan My Trip</button>
+    <h3>Meals</h3>
+      <MealInput
+        mealType="Breakfast"
+        meals={breakfastMeals}
+        onAddMeal={handleAddMeal}
+        onRemoveMeal={handleRemoveMeal}
+      />
+      <MealInput
+        mealType="Lunch"
+        meals={lunchMeals}
+        onAddMeal={handleAddMeal}
+        onRemoveMeal={handleRemoveMeal}
+      />
+      <MealInput
+        mealType="Dinner"
+        meals={dinnerMeals}
+        onAddMeal={handleAddMeal}
+        onRemoveMeal={handleRemoveMeal}
+      />
+
+    {validationErrors.length > 0 && (
+    <div style={{color: 'red'}}>
+      {validationErrors.map((err, index) => (
+        <p key={index}>{err}</p>
+      ))}
+    </div>
+  )}
+
+    <button onClick={handleSubmit}>Plan My Trip</button>
 
     </div>
   );
