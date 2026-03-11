@@ -1,6 +1,11 @@
 import { useState } from 'react';
 import { searchCampgrounds } from '../services/recreationApi';
 import MealInput from '../components/MealInput';
+import { fetchHikesNearCampground } from '../services/hikingApi';
+import { useEffect, useRef } from 'react';
+import { parseTrailsFromDescription } from '../utils/descriptionParser';
+import HikeSelector from '../components/HikeSelector';
+import { selectHikesForTrip } from '../utils/hikeSelector';
 
 function HomePage() {
   //const [sheetLink, setSheetLink] = useState('');
@@ -22,22 +27,93 @@ function HomePage() {
   const [lunchMeals, setLunchMeals] = useState([]);
   const [dinnerMeals, setDinnerMeals] = useState([]);
   const [validationErrors, setValidationErrors] = useState([]);
+  const [favoritedHikes, setFavoritedHikes] = useState([]);
+  const [scheduledHikes, setScheduledHikes] = useState([]);
+  const [honorableMentions, setHonorableMentions] = useState([]);
+  const [availableHikes, setAvailableHikes] = useState([]);
+
+  // Loading type ref
+  const searchTimeoutRef = useRef(null);
+
+  useEffect(() => {
+    if (!selectedCampground || !availableHikes.parsed) return;
+
+    const numberOfHikeSlots = wantsMorningHikes
+      ? parseInt(morningHikeDays) || 1
+      : Math.max(1, (parseInt(numberOfDays) || 1) - 1);
+
+    const { scheduledHikes: scheduled, honorableMentions: mentions } = selectHikesForTrip({
+      parsedHikes: availableHikes.parsed,
+      radiusHikes: availableHikes.radius,
+      favoritedHikes,
+      hikingLevel,
+      numberOfHikeSlots,
+      campLat: selectedCampground.FacilityLatitude,
+      campLon: selectedCampground.FacilityLongitude,
+    });
+
+    setScheduledHikes(scheduled);
+    setHonorableMentions(mentions);
+  }, [availableHikes, favoritedHikes, hikingLevel, numberOfDays, wantsMorningHikes, morningHikeDays, selectedCampground]);
   
   async function handleCampgroundSearch(event) {
-    setCampgroundSearch(event.target.value);
+    const value = event.target.value;
+    setCampgroundSearch(value);
     setError(null);
-    if (event.target.value.length > 2) {
-      setIsLoading(true);
-      try {
-        const results = await searchCampgrounds(event.target.value);
-        setCampgroundResults(results);
-      } catch (err) {
-        setError('Unable to search campgrounds. Please try again.');
-        setCampgroundResults([]);
-      } finally {
-        setIsLoading(false);
-      }
+
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
     }
+
+    if (value.length > 2) {
+      searchTimeoutRef.current = setTimeout(async () => {
+        setIsLoading(true);
+        try {
+          const results = await searchCampgrounds(value);
+          setCampgroundResults(results);
+        } catch (err) {
+          setError('Unable to search campgrounds. Please try again.');
+          setCampgroundResults([]);
+        } finally {
+          setIsLoading(false);
+        }
+      }, 500);
+    } else {
+      setCampgroundResults([]);
+    }
+  }
+
+  async function handleCampgroundSelect(campground) {
+    setSelectedCampground(campground);
+    setCampgroundSearch(campground.FacilityName);
+    setCampgroundResults([]);
+
+    const parsed = parseTrailsFromDescription(campground.FacilityDescription);
+
+    try {
+      const radius = await fetchHikesNearCampground(
+        campground.FacilityLatitude,
+        campground.FacilityLongitude
+      );
+      setAvailableHikes({ parsed, radius: radius || [] });
+    } catch (err) {
+      console.error('Error fetching radius hikes:', err);
+      setAvailableHikes({ parsed, radius: [] });
+    }
+  }
+
+  function handleToggleFavorite(hike) {
+    setFavoritedHikes(prev => {
+      const alreadyFavorited = prev.some(f => f.name === hike.name);
+      return alreadyFavorited
+        ? prev.filter(f => f.name !== hike.name)
+        : [...prev, hike];
+    });
+  }
+
+  function handleRemoveFromSchedule(hike) {
+    setScheduledHikes(prev => prev.filter(h => h.name !== hike.name));
+    setHonorableMentions(prev => [...prev, hike]);
   }
 
   function handleAddMeal(mealType, meal) {
@@ -53,7 +129,7 @@ function HomePage() {
   }
 
   function handleArrivalTimeChange(event) {
-  setArrivalTime(event.target.value);
+    setArrivalTime(event.target.value);
   }
 
   function handleWakeUpTimeChange(event) {
@@ -82,7 +158,7 @@ function HomePage() {
   }
 
   function handleHikingLevelChange(event) {
-  setHikingLevel(event.target.value);
+    setHikingLevel(event.target.value);
   }
 
   function handleSubmit() {
@@ -219,7 +295,7 @@ function HomePage() {
         {campgroundResults.map((campground) => (
         <li
             key={campground.FacilityID}
-            onClick={() => setSelectedCampground(campground)}
+            onClick={() => handleCampgroundSelect(campground)}
         >
             {campground.FacilityName}
         </li>
@@ -259,6 +335,22 @@ function HomePage() {
         <p key={index}>{err}</p>
       ))}
     </div>
+  )}
+
+    {selectedCampground && (
+    <HikeSelector
+      scheduledHikes={scheduledHikes}
+      honorableMentions={honorableMentions}
+      favoritedHikes={favoritedHikes}
+      allAvailableHikes={[
+        ...(availableHikes.parsed || []),
+        ...(availableHikes.radius || []),
+      ]}
+      onToggleFavorite={handleToggleFavorite}
+      onRemoveFromSchedule={handleRemoveFromSchedule}
+      campLat={selectedCampground.FacilityLatitude}
+      campLon={selectedCampground.FacilityLongitude}
+    />
   )}
 
     <button onClick={handleSubmit}>Plan My Trip</button>
