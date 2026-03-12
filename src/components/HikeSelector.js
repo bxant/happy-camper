@@ -123,9 +123,9 @@ export default function HikeSelector({
       {sorted.length === 0 ? (
         <p style={{ color: '#888' }}>No hikes found within {maxDriveMinutes} minutes of camp.</p>
       ) : (
-        sorted.map(hike => (
+        sorted.map((hike, index) => (
           <div
-            key={hike.name}
+            key={`${hike.source}-${hike.name}-${index}`}
             onClick={() => onAddHike(hike)}
             style={{
               border: '1px solid #ccc',
