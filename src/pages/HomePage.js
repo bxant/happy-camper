@@ -2,10 +2,9 @@ import { useState } from 'react';
 import { searchCampgrounds } from '../services/recreationApi';
 import MealInput from '../components/MealInput';
 import { fetchHikesNearCampground } from '../services/hikingApi';
-import { useEffect, useRef } from 'react';
+import { useRef } from 'react';
 import { parseTrailsFromDescription } from '../utils/descriptionParser';
 import HikeSelector from '../components/HikeSelector';
-import { selectHikesForTrip } from '../utils/hikeSelector';
 
 function HomePage() {
   //const [sheetLink, setSheetLink] = useState('');
@@ -27,35 +26,13 @@ function HomePage() {
   const [lunchMeals, setLunchMeals] = useState([]);
   const [dinnerMeals, setDinnerMeals] = useState([]);
   const [validationErrors, setValidationErrors] = useState([]);
-  const [favoritedHikes, setFavoritedHikes] = useState([]);
-  const [scheduledHikes, setScheduledHikes] = useState([]);
-  const [honorableMentions, setHonorableMentions] = useState([]);
+  const [preferredHikes, setPreferredHikes] = useState([]);  
   const [availableHikes, setAvailableHikes] = useState([]);
 
   // Loading type ref
   const searchTimeoutRef = useRef(null);
 
-  useEffect(() => {
-    if (!selectedCampground || !availableHikes.parsed) return;
-
-    const numberOfHikeSlots = wantsMorningHikes
-      ? parseInt(morningHikeDays) || 1
-      : Math.max(1, (parseInt(numberOfDays) || 1) - 1);
-
-    const { scheduledHikes: scheduled, honorableMentions: mentions } = selectHikesForTrip({
-      parsedHikes: availableHikes.parsed,
-      radiusHikes: availableHikes.radius,
-      favoritedHikes,
-      hikingLevel,
-      numberOfHikeSlots,
-      campLat: selectedCampground.FacilityLatitude,
-      campLon: selectedCampground.FacilityLongitude,
-    });
-
-    setScheduledHikes(scheduled);
-    setHonorableMentions(mentions);
-  }, [availableHikes, favoritedHikes, hikingLevel, numberOfDays, wantsMorningHikes, morningHikeDays, selectedCampground]);
-  
+    
   async function handleCampgroundSearch(event) {
     const value = event.target.value;
     setCampgroundSearch(value);
@@ -102,18 +79,16 @@ function HomePage() {
     }
   }
 
-  function handleToggleFavorite(hike) {
-    setFavoritedHikes(prev => {
-      const alreadyFavorited = prev.some(f => f.name === hike.name);
-      return alreadyFavorited
-        ? prev.filter(f => f.name !== hike.name)
-        : [...prev, hike];
+  function handleAddHike(hike) {
+    const normalized = { ...hike, name: hike.name || hike.FacilityName };
+    setPreferredHikes(prev => {
+      if (prev.some(p => p.name === normalized.name)) return prev;
+      return [...prev, normalized];
     });
   }
 
-  function handleRemoveFromSchedule(hike) {
-    setScheduledHikes(prev => prev.filter(h => h.name !== hike.name));
-    setHonorableMentions(prev => [...prev, hike]);
+  function handleRemoveHike(hike) {
+    setPreferredHikes(prev => prev.filter(p => p.name !== hike.name));
   }
 
   function handleAddMeal(mealType, meal) {
@@ -339,15 +314,13 @@ function HomePage() {
 
     {selectedCampground && (
     <HikeSelector
-      scheduledHikes={scheduledHikes}
-      honorableMentions={honorableMentions}
-      favoritedHikes={favoritedHikes}
       allAvailableHikes={[
         ...(availableHikes.parsed || []),
         ...(availableHikes.radius || []),
       ]}
-      onToggleFavorite={handleToggleFavorite}
-      onRemoveFromSchedule={handleRemoveFromSchedule}
+      preferredHikes={preferredHikes}
+      onAddHike={handleAddHike}
+      onRemoveHike={handleRemoveHike}
       campLat={selectedCampground.FacilityLatitude}
       campLon={selectedCampground.FacilityLongitude}
     />
