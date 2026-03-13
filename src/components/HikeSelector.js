@@ -12,38 +12,28 @@ function getDriveLabel(distanceMiles) {
   return `~${minutes} min drive`;
 }
 
-function HikeCard({ hike, actionButton }) {
-  const nameElement = hike.allTrailsUrl ? (
-    <a
-      href={hike.allTrailsUrl}
-      target="_blank"
-      rel="noopener noreferrer"
-      onClick={e => e.stopPropagation()}
-      style={{ color: '#2d6a2d', fontWeight: 'bold', textDecoration: 'underline' }}
-    >
-      {hike.name}
-    </a>
-  ) : (
-    <strong>{hike.name}</strong>
-  );
-
+function HikeCard({ hike, actionButton, onClick }) {
   return (
-    <div style={{
-      border: '1px solid #ccc',
-      padding: '10px 12px',
-      marginBottom: '8px',
-      borderRadius: '6px',
-      backgroundColor: '#fff',
-    }}>
+    <div
+      onClick={onClick}
+      style={{
+        border: '1px solid #ccc',
+        padding: '10px 12px',
+        marginBottom: '8px',
+        borderRadius: '6px',
+        backgroundColor: '#fff',
+        cursor: onClick ? 'pointer' : 'default',
+      }}
+    >
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <div style={{ flex: 1 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-            {nameElement}
-            {hike.allTrailsUrl && (
-              <span style={{ fontSize: '0.75em', color: '#888' }}>(AllTrails ↗)</span>
-            )}
+            <strong>{hike.name}</strong>
             {hike.offroadWarning && (
-              <span style={{ color: '#cc6600', fontSize: '0.8em' }}>⚠️ May require high clearance</span>
+              <span style={{ color: '#cc6600', fontSize: '0.8em' }}>⚠️ High clearance may be needed</span>
+            )}
+            {hike.needsVerify && !hike.offroadWarning && (
+              <span style={{ color: '#999', fontSize: '0.8em' }}>⚠️ Verify before visiting</span>
             )}
           </div>
           <div style={{ fontSize: '0.85em', color: '#555', marginTop: '4px', display: 'flex', flexDirection: 'column', gap: '2px' }}>
@@ -51,17 +41,63 @@ function HikeCard({ hike, actionButton }) {
               <strong>Distance from campsite:</strong>{' '}
               {hike.distFromCamp !== null ? getDriveLabel(hike.distFromCamp) : 'Unknown'}
             </span>
-            <span>
-              <strong>Hike distance:</strong>{' '}
-              {hike.distanceMiles ? `${hike.distanceMiles} miles` : 'Unknown'}
-            </span>
+            {hike.distanceMiles && (
+              <span>
+                <strong>Hike distance:</strong> {hike.distanceMiles} miles
+              </span>
+            )}
           </div>
         </div>
-        <div style={{ paddingLeft: '12px', flexShrink: 0 }}>
+        <div
+          style={{ paddingLeft: '12px', flexShrink: 0 }}
+          onClick={e => e.stopPropagation()}
+        >
           {actionButton}
         </div>
       </div>
     </div>
+  );
+}
+
+function AddButton({ onAdd }) {
+  return (
+    <button
+      onClick={onAdd}
+      style={{
+        background: 'none',
+        border: '1px solid #aaa',
+        borderRadius: '50%',
+        cursor: 'pointer',
+        fontSize: '1.2em',
+        width: '28px',
+        height: '28px',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        color: '#333',
+        padding: '0',
+      }}
+    >
+      +
+    </button>
+  );
+}
+
+function RemoveButton({ onRemove }) {
+  return (
+    <button
+      onClick={onRemove}
+      style={{
+        background: 'none',
+        border: 'none',
+        cursor: 'pointer',
+        fontSize: '1em',
+        color: '#555',
+        padding: '0',
+      }}
+    >
+      ✕
+    </button>
   );
 }
 
@@ -73,7 +109,8 @@ export default function HikeSelector({
   campLat,
   campLon,
 }) {
-  const [maxDriveMinutes, setMaxDriveMinutes] = useState(60);
+  const [maxDriveMinutes, setMaxDriveMinutes] = useState(15);
+  const [activeTab, setActiveTab] = useState('trails');
 
   function getDistanceFromCamp(hike) {
     if (!campLat || !campLon) return null;
@@ -88,6 +125,7 @@ export default function HikeSelector({
     return preferredHikes.some(p => p.name === (hike.name || hike.FacilityName));
   }
 
+  // Attach distance, normalize name, exclude already-preferred
   const hikesWithDistance = allAvailableHikes
     .map(hike => {
       const name = hike.name || hike.FacilityName;
@@ -97,57 +135,77 @@ export default function HikeSelector({
     })
     .filter(hike => !isPreferred(hike));
 
-  const filtered = hikesWithDistance.filter(hike =>
+  // Drive time filter
+  const withinRange = hikesWithDistance.filter(hike =>
     hike.driveMinutes === null || hike.driveMinutes <= maxDriveMinutes
   );
 
-  const sorted = [...filtered].sort((a, b) => {
-    if (a.driveMinutes === null && b.driveMinutes === null) return 0;
-    if (a.driveMinutes === null) return 1;
-    if (b.driveMinutes === null) return -1;
-    return a.driveMinutes - b.driveMinutes;
-  });
+  // Split into trails vs all paths
+  // facility_description hikes are always trusted — they came from the campground's own listing
+  // "trails" = description source OR (no needsVerify and no offroadWarning)
+  // "allPaths" = everything else (roads, OHV, flagged names)
+  const trails = withinRange.filter(hike =>
+    hike.source === 'facility_description' || (!hike.needsVerify && !hike.offroadWarning)
+  );
+  const allPaths = withinRange.filter(hike =>
+    hike.source !== 'facility_description' && (hike.needsVerify || hike.offroadWarning)
+  );
 
-  // Attach distance info to preferred hikes for the full card display
+  function sortByDistance(list) {
+    return [...list].sort((a, b) => {
+      // Parsed description hikes always float to the top
+      const aDesc = a.source === 'facility_description' ? 0 : 1;
+      const bDesc = b.source === 'facility_description' ? 0 : 1;
+      if (aDesc !== bDesc) return aDesc - bDesc;
+
+      if (a.driveMinutes === null && b.driveMinutes === null) return 0;
+      if (a.driveMinutes === null) return 1;
+      if (b.driveMinutes === null) return -1;
+      return a.driveMinutes - b.driveMinutes;
+    });
+  }
+
+  const sortedTrails = sortByDistance(trails);
+  const sortedAllPaths = sortByDistance(allPaths);
+  const activeList = activeTab === 'trails' ? sortedTrails : sortedAllPaths;
+
   const preferredWithDistance = preferredHikes.map(hike => {
     const distFromCamp = getDistanceFromCamp(hike);
     const driveMinutes = distFromCamp !== null ? getDriveMinutes(distFromCamp) : null;
     return { ...hike, distFromCamp, driveMinutes };
   });
 
+  const tabStyle = (tab) => ({
+    padding: '6px 16px',
+    border: '1px solid #ccc',
+    borderRadius: '20px',
+    cursor: 'pointer',
+    fontSize: '0.85em',
+    fontWeight: activeTab === tab ? 'bold' : 'normal',
+    backgroundColor: activeTab === tab ? '#2d6a2d' : '#f5f5f5',
+    color: activeTab === tab ? '#fff' : '#333',
+  });
+
   return (
     <div style={{ marginTop: '24px' }}>
-
       <h3>Hike Preferences</h3>
       {preferredWithDistance.length === 0 ? (
         <p style={{ color: '#888', fontSize: '0.9em' }}>
-          No hikes selected yet. Click + on a hike below to add it.
+          No hikes selected yet. Click a hike below to add it.
         </p>
       ) : (
         preferredWithDistance.map(hike => (
           <HikeCard
             key={hike.name}
             hike={hike}
-            actionButton={
-              <button
-                onClick={() => onRemoveHike(hike)}
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  cursor: 'pointer',
-                  fontSize: '1em',
-                  color: '#555',
-                  padding: '0',
-                }}
-              >
-                ✕
-              </button>
-            }
+            actionButton={<RemoveButton onRemove={() => onRemoveHike(hike)} />}
           />
         ))
       )}
 
       <h3 style={{ marginTop: '24px' }}>Nearby Hikes</h3>
+
+      {/* Drive time slider */}
       <div style={{ marginBottom: '16px' }}>
         <label style={{ display: 'block', marginBottom: '4px', fontSize: '0.9em' }}>
           Max drive time from camp: <strong>{maxDriveMinutes} min</strong>
@@ -163,34 +221,35 @@ export default function HikeSelector({
         />
       </div>
 
-      {sorted.length === 0 ? (
-        <p style={{ color: '#888' }}>No hikes found within {maxDriveMinutes} minutes of camp.</p>
+      {/* Tab toggle */}
+      <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
+        <button style={tabStyle('trails')} onClick={() => setActiveTab('trails')}>
+          🥾 Hiking Trails {sortedTrails.length > 0 && `(${sortedTrails.length})`}
+        </button>
+        <button style={tabStyle('allPaths')} onClick={() => setActiveTab('allPaths')}>
+          🛤️ All Paths {sortedAllPaths.length > 0 && `(${sortedAllPaths.length})`}
+        </button>
+      </div>
+
+      {activeTab === 'allPaths' && (
+        <p style={{ fontSize: '0.8em', color: '#888', marginBottom: '12px' }}>
+          These paths may include fire roads, OHV routes, or service roads. Verify before visiting.
+        </p>
+      )}
+
+      {activeList.length === 0 ? (
+        <p style={{ color: '#888' }}>
+          {activeTab === 'trails'
+            ? `No hiking trails found within ${maxDriveMinutes} minutes of camp.`
+            : `No other paths found within ${maxDriveMinutes} minutes of camp.`}
+        </p>
       ) : (
-        sorted.map((hike, index) => (
+        activeList.map((hike, index) => (
           <HikeCard
             key={`${hike.source}-${hike.name}-${index}`}
             hike={hike}
-            actionButton={
-              <button
-                onClick={() => onAddHike(hike)}
-                style={{
-                  background: 'none',
-                  border: '1px solid #aaa',
-                  borderRadius: '50%',
-                  cursor: 'pointer',
-                  fontSize: '1.2em',
-                  width: '28px',
-                  height: '28px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  color: '#333',
-                  padding: '0',
-                }}
-              >
-                +
-              </button>
-            }
+            onClick={() => onAddHike(hike)}
+            actionButton={<AddButton onAdd={() => onAddHike(hike)} />}
           />
         ))
       )}

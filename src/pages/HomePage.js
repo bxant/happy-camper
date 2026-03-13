@@ -9,9 +9,8 @@ import CampgroundDetail from '../components/CampgroundDetail';
 import { fetchNPSAlerts, getParkCodeForCampground } from '../services/npsApi';
 
 function HomePage() {
-  //const [sheetLink, setSheetLink] = useState('');
   const [startDate, setStartDate] = useState('');
-  const [numberOfDays, setNumberOfDays] = useState(1);
+  const [endDate, setEndDate] = useState('');
   const [hikingLevel, setHikingLevel] = useState('beginner');
   const [campgroundSearch, setCampgroundSearch] = useState('');
   const [campgroundResults, setCampgroundResults] = useState([]);
@@ -28,14 +27,28 @@ function HomePage() {
   const [lunchMeals, setLunchMeals] = useState([]);
   const [dinnerMeals, setDinnerMeals] = useState([]);
   const [validationErrors, setValidationErrors] = useState([]);
-  const [preferredHikes, setPreferredHikes] = useState([]);  
+  const [preferredHikes, setPreferredHikes] = useState([]);
   const [availableHikes, setAvailableHikes] = useState([]);
   const [npsAlerts, setNpsAlerts] = useState([]);
 
-  // Loading type ref
   const searchTimeoutRef = useRef(null);
 
-    
+  // Derived from date range
+  const numberOfDays = startDate && endDate
+    ? Math.max(1, Math.round((new Date(endDate) - new Date(startDate)) / (1000 * 60 * 60 * 24)))
+    : 0;
+
+  function handleStartDateChange(event) {
+    const value = event.target.value;
+    setStartDate(value);
+    // Clear end date if it's now before the new start date
+    if (endDate && value >= endDate) setEndDate('');
+  }
+
+  function handleEndDateChange(event) {
+    setEndDate(event.target.value);
+  }
+
   async function handleCampgroundSearch(event) {
     const value = event.target.value;
     setCampgroundSearch(value);
@@ -128,43 +141,22 @@ function HomePage() {
     if (mealType === 'Dinner') setDinnerMeals(dinnerMeals.filter((_, i) => i !== index));
   }
 
-  function handleArrivalTimeChange(event) {
-    setArrivalTime(event.target.value);
-  }
-
-  function handleWakeUpTimeChange(event) {
-    setWakeUpTime(event.target.value);
-  }
-
-  function handleBedTimeChange(event) {
-    setBedTime(event.target.value);
-  }
+  function handleArrivalTimeChange(event) { setArrivalTime(event.target.value); }
+  function handleWakeUpTimeChange(event) { setWakeUpTime(event.target.value); }
+  function handleBedTimeChange(event) { setBedTime(event.target.value); }
 
   function handleMorningHikeDaysChange(event) {
     const value = Math.min(Number(event.target.value), numberOfDays - 2);
     setMorningHikeDays(value);
   }
 
-  // function handleSheetLinkChange(event) {
-  //   setSheetLink(event.target.value);
-  // }
-
-  function handleStartDateChange(event) {
-    setStartDate(event.target.value);
-  }
-
-  function handleNumberOfDaysChange(event) {
-    setNumberOfDays(event.target.value);
-  }
-
-  function handleHikingLevelChange(event) {
-    setHikingLevel(event.target.value);
-  }
+  function handleHikingLevelChange(event) { setHikingLevel(event.target.value); }
 
   function handleSubmit() {
     const errors = [];
 
     if (!startDate) errors.push('Please select a trip start date.');
+    if (!endDate) errors.push('Please select a trip end date.');
     if (!selectedCampground) errors.push('Please search and select a campground.');
     if (breakfastMeals.length === 0) errors.push('Please add at least one breakfast meal.');
     if (lunchMeals.length === 0) errors.push('Please add at least one lunch meal.');
@@ -177,6 +169,7 @@ function HomePage() {
 
     setValidationErrors([]);
     console.log('Start Date:', startDate);
+    console.log('End Date:', endDate);
     console.log('Number of Days:', numberOfDays);
     console.log('Hiking Level:', hikingLevel);
     console.log('Campground:', selectedCampground.FacilityName);
@@ -184,135 +177,131 @@ function HomePage() {
     console.log('Lunch:', lunchMeals);
     console.log('Dinner:', dinnerMeals);
   }
-  // function handleSubmit() {
-  // // console.log('Sheet Link:', sheetLink);
-  // console.log('Start Date:', startDate);
-  // console.log('Number of Days:', numberOfDays);
-  // console.log('Hiking Level:', hikingLevel);
-  // }
+
+  const mergedHikes = (() => {
+    const parsed = availableHikes.parsed || [];
+    const overpass = availableHikes.overpass || [];
+    const parsedNames = new Set(parsed.map(h => h.name?.toLowerCase()));
+    const deduped = overpass.filter(h => !parsedNames.has(h.name?.toLowerCase()));
+    return [...parsed, ...deduped];
+    })();
 
   return (
     <div className="home-page">
-      {/* <h2>Plan Your Trip</h2>
 
-      <label>Google Sheet Link</label>
-      <input
-        type="text"
-        value={sheetLink}
-        onChange={handleSheetLinkChange}
-        placeholder="Paste your Google Sheet link here"
-      /> */}
-
-      <label>Trip Start Date</label>
+      <label>Arrival Date</label>
       <input
         type="date"
         value={startDate}
         onChange={handleStartDateChange}
       />
 
-      <label>Number of Days</label>
-      <select value={numberOfDays} onChange={handleNumberOfDaysChange}>
-        <option value={1}>1 day</option>
-        <option value={2}>2 days</option>
-        <option value={3}>3 days</option>
-        <option value={4}>4 days</option>
-        <option value={5}>5 days</option>
-        <option value={6}>6 days</option>
-        <option value={7}>7 days</option>
-      </select>
+      <label>Departure Date</label>
+      <input
+        type="date"
+        value={endDate}
+        min={startDate || undefined}
+        onChange={handleEndDateChange}
+        disabled={!startDate}
+      />
 
-      
-    <label>Hiking Comfort Level</label>
-    <select value={hikingLevel} onChange={handleHikingLevelChange}>
+      {numberOfDays > 0 && (
+        <p style={{ fontSize: '0.85em', color: '#555', margin: '4px 0 8px' }}>
+          {numberOfDays} night{numberOfDays !== 1 ? 's' : ''}
+        </p>
+      )}
+
+      <label>Hiking Comfort Level</label>
+      <select value={hikingLevel} onChange={handleHikingLevelChange}>
         <option value="beginner">Beginner (0-3 miles)</option>
         <option value="intermediate">Intermediate (3-6 miles)</option>
         <option value="advanced">Advanced (6-10 miles)</option>
         <option value="pro">Absolute Pro (10+ miles)</option>
-    </select>
+      </select>
 
-    <label>Expected Arrival Time (Day 1)</label>
-    <input
-      type="time"
-      value={arrivalTime}
-      onChange={handleArrivalTimeChange}
-    />
-
-    <label>Expected Wake Up Time</label>
-    <input
-      type="time"
-      value={wakeUpTime}
-      onChange={handleWakeUpTimeChange}
-    />
-
-    <label>Expected Bedtime</label>
-    <input
-      type="time"
-      value={bedTime}
-      onChange={handleBedTimeChange}
-    />
-
-    <label>
+      <label>Expected Arrival Time (Day 1)</label>
       <input
-        type="checkbox"
-        checked={wantsMorningHikes}
-        onChange={(e) => setWantsMorningHikes(e.target.checked)}
+        type="time"
+        value={arrivalTime}
+        onChange={handleArrivalTimeChange}
       />
-      I would like morning hikes recommended
-    </label>
 
-    {wantsMorningHikes && (
-      <>
-        <label>Number of Morning Hike Days</label>
-        <small>Morning hikes will not be scheduled on arrival or departure day.</small>
+      <label>Expected Wake Up Time</label>
+      <input
+        type="time"
+        value={wakeUpTime}
+        onChange={handleWakeUpTimeChange}
+      />
+
+      <label>Expected Bedtime</label>
+      <input
+        type="time"
+        value={bedTime}
+        onChange={handleBedTimeChange}
+      />
+
+      <label>
         <input
-          type="number"
-          min={0}
-          max={numberOfDays - 2}
-          value={morningHikeDays}
-          onChange={handleMorningHikeDaysChange}
+          type="checkbox"
+          checked={wantsMorningHikes}
+          onChange={(e) => setWantsMorningHikes(e.target.checked)}
         />
-      </>
-    )}
+        I would like morning hikes recommended
+      </label>
 
-    <label>
+      {wantsMorningHikes && (
+        <>
+          <label>Number of Morning Hike Days</label>
+          <small>Morning hikes will not be scheduled on arrival or departure day.</small>
+          <input
+            type="number"
+            min={0}
+            max={numberOfDays - 2}
+            value={morningHikeDays}
+            onChange={handleMorningHikeDaysChange}
+          />
+        </>
+      )}
+
+      <label>
+        <input
+          type="checkbox"
+          checked={hikeOnArrivalDay}
+          onChange={(e) => setHikeOnArrivalDay(e.target.checked)}
+        />
+        I want to hike on my arrival day
+      </label>
+
+      <label>Search Campground</label>
       <input
-        type="checkbox"
-        checked={hikeOnArrivalDay}
-        onChange={(e) => setHikeOnArrivalDay(e.target.checked)}
+        type="text"
+        value={campgroundSearch}
+        onChange={handleCampgroundSearch}
+        placeholder="Search for a campground"
       />
-      I want to hike on my arrival day
-    </label>
+      {campgroundResults.length > 0 && (
+        <ul>
+          {campgroundResults.map((campground) => (
+            <li
+              key={campground.FacilityID}
+              onClick={() => handleCampgroundSelect(campground)}
+            >
+              {campground.FacilityName}
+            </li>
+          ))}
+        </ul>
+      )}
+      {selectedCampground && (
+        <CampgroundDetail
+          campground={selectedCampground}
+          npsAlerts={npsAlerts}
+        />
+      )}
 
-    <label>Search Campground</label>
-    <input
-    type="text"
-    value={campgroundSearch}
-    onChange={handleCampgroundSearch}
-    placeholder="Search for a campground"
-    />
-    {campgroundResults.length > 0 && (
-    <ul>
-        {campgroundResults.map((campground) => (
-        <li
-            key={campground.FacilityID}
-            onClick={() => handleCampgroundSelect(campground)}
-        >
-            {campground.FacilityName}
-        </li>
-        ))}
-    </ul>
-    )}
-    {selectedCampground && (
-      <CampgroundDetail
-        campground={selectedCampground}
-        npsAlerts={npsAlerts}
-      />
-    )}
+      {isLoading && <p>Searching...</p>}
+      {error && <p style={{ color: 'red' }}>{error}</p>}
 
-    {isLoading && <p>Searching...</p>}
-    {error && <p style={{color: 'red'}}>{error}</p>}
-
-    <h3>Meals</h3>
+      <h3>Meals</h3>
       <MealInput
         mealType="Breakfast"
         meals={breakfastMeals}
@@ -332,30 +321,26 @@ function HomePage() {
         onRemoveMeal={handleRemoveMeal}
       />
 
-    {validationErrors.length > 0 && (
-    <div style={{color: 'red'}}>
-      {validationErrors.map((err, index) => (
-        <p key={index}>{err}</p>
-      ))}
-    </div>
-  )}
+      {validationErrors.length > 0 && (
+        <div style={{ color: 'red' }}>
+          {validationErrors.map((err, index) => (
+            <p key={index}>{err}</p>
+          ))}
+        </div>
+      )}
 
-    {selectedCampground && (
-    <HikeSelector
-      allAvailableHikes={[
-  ...(availableHikes.parsed || []),
-  ...(availableHikes.radius || []),
-  ...(availableHikes.overpass || []),
-]}
-      preferredHikes={preferredHikes}
-      onAddHike={handleAddHike}
-      onRemoveHike={handleRemoveHike}
-      campLat={selectedCampground.FacilityLatitude}
-      campLon={selectedCampground.FacilityLongitude}
-    />
-  )}
+      {selectedCampground && (
+        <HikeSelector
+          allAvailableHikes={mergedHikes}
+          preferredHikes={preferredHikes}
+          onAddHike={handleAddHike}
+          onRemoveHike={handleRemoveHike}
+          campLat={selectedCampground.FacilityLatitude}
+          campLon={selectedCampground.FacilityLongitude}
+        />
+      )}
 
-    <button onClick={handleSubmit}>Plan My Trip</button>
+      <button onClick={handleSubmit}>Plan My Trip</button>
 
     </div>
   );

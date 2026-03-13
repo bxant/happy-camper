@@ -42,14 +42,12 @@ function parseSections(html) {
     const header = SECTION_HEADERS[i];
     const nextHeader = SECTION_HEADERS[i + 1];
 
-    // Match <h2>Header</h2> content
     const startTag = `<h2>${header}</h2>`;
     const startIndex = html.indexOf(startTag);
     if (startIndex === -1) continue;
 
     const contentStart = startIndex + startTag.length;
 
-    // Find where this section ends
     let contentEnd = html.length;
     if (nextHeader) {
       const nextIndex = html.indexOf(`<h2>${nextHeader}</h2>`);
@@ -64,7 +62,6 @@ function parseSections(html) {
     }
   }
 
-  // Fallback: if no h2 sections found, just strip and cut the whole thing
   if (sections.length === 0) {
     const fallback = cutBoilerplate(stripHtml(html));
     if (fallback) sections.push({ header: 'About', content: fallback });
@@ -83,7 +80,6 @@ export default function CampgroundDetail({ campground, npsAlerts }) {
     <div style={{ marginTop: '16px', marginBottom: '24px', borderTop: '2px solid #ccc', paddingTop: '16px' }}>
       <h2>{campground.FacilityName}</h2>
 
-      {/* NPS Alerts */}
       {npsAlerts && npsAlerts.length > 0 && (
         <div style={{ marginBottom: '16px' }}>
           <h4 style={{ color: '#cc0000', marginBottom: '8px' }}>⚠️ Active Alerts</h4>
@@ -108,14 +104,7 @@ export default function CampgroundDetail({ campground, npsAlerts }) {
         </div>
       )}
 
-      {/* Quick facts */}
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', marginBottom: '16px' }}>
-        {campground.FacilityUseFeeDescription && (
-          <div style={tagStyle}>💰 Fee: {campground.FacilityUseFeeDescription}</div>
-        )}
-        {campground.Reservable && (
-          <div style={tagStyle}>📅 Reservable</div>
-        )}
         {campground.FacilityAdaAccess === 'Y' && (
           <div style={tagStyle}>♿ ADA Accessible</div>
         )}
@@ -126,24 +115,23 @@ export default function CampgroundDetail({ campground, npsAlerts }) {
           <div style={tagStyle}>📞 {campground.FacilityPhone}</div>
         )}
         {campground.FacilityID && (
-            <a
+          <a
             href={`https://www.recreation.gov/camping/campgrounds/${campground.FacilityID}`}
             target="_blank"
             rel="noopener noreferrer"
             style={{
-            ...tagStyle,
-            textDecoration: 'none',
-            color: '#1a6b3a',
-            backgroundColor: '#e8f4e8',
-            border: '1px solid #a8d5a8',
+              ...tagStyle,
+              textDecoration: 'none',
+              color: '#1a6b3a',
+              backgroundColor: '#e8f4e8',
+              border: '1px solid #a8d5a8',
             }}
-        >
+          >
             🏕️ View on Recreation.gov
-        </a>
+          </a>
         )}
       </div>
 
-      {/* Parsed sections — Overview always expanded, rest collapsed */}
       {sections.map((section, index) => (
         <CollapsibleSection
           key={section.header}
@@ -153,7 +141,6 @@ export default function CampgroundDetail({ campground, npsAlerts }) {
         />
       ))}
 
-      {/* Directions */}
       {directions && (
         <CollapsibleSection
           header="Directions"
