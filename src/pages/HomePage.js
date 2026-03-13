@@ -1,12 +1,12 @@
 import { useState } from 'react';
 import { searchCampgrounds } from '../services/recreationApi';
 import MealInput from '../components/MealInput';
-import { fetchHikesNearCampground, fetchHikesFromOverpass } from '../services/hikingApi';
+import { fetchHikesFromOverpass } from '../services/hikingApi';
 import { useRef } from 'react';
 import { parseTrailsFromDescription } from '../utils/descriptionParser';
 import HikeSelector from '../components/HikeSelector';
 import CampgroundDetail from '../components/CampgroundDetail';
-import { findNearbyNPSPark, fetchNPSAlerts } from '../services/npsApi';
+import { fetchNPSAlerts, getParkCodeForCampground } from '../services/npsApi';
 
 function HomePage() {
   //const [sheetLink, setSheetLink] = useState('');
@@ -64,6 +64,7 @@ function HomePage() {
   }
 
   async function handleCampgroundSelect(campground) {
+    console.log('campground object:', campground);
     setSelectedCampground(campground);
     setCampgroundSearch(campground.FacilityName);
     setCampgroundResults([]);
@@ -73,39 +74,29 @@ function HomePage() {
     console.log("Parsed trails: ", parsed);
 
     try {
-      const [radius, overpass, npspark] = await Promise.all([
-        fetchHikesNearCampground(
-          campground.FacilityLatitude,
-          campground.FacilityLongitude
-        ),
-        fetchHikesFromOverpass(
-          campground.FacilityLatitude,
-          campground.FacilityLongitude
-        ),
-        findNearbyNPSPark(
-          campground.FacilityLatitude,
-          campground.FacilityLongitude
-        ),
-      ]);
+      const overpass = await fetchHikesFromOverpass(
+        campground.FacilityLatitude,
+        campground.FacilityLongitude
+      );
 
-      console.log("radius hikes: ", radius);
       console.log("overpass hikes: ", overpass);
       console.log("overpass length: ", overpass?.length);
-      console.log("NPS park: ", npspark);
 
-      if (npspark) {
-        const alerts = await fetchNPSAlerts(npspark.parkCode);
+      setAvailableHikes({
+        parsed,
+        radius: [],
+        overpass: overpass || [],
+      });
+
+      const parkCode = getParkCodeForCampground(campground.FacilityName);
+      if (parkCode) {
+        const alerts = await fetchNPSAlerts(parkCode);
         console.log("NPS alerts: ", alerts);
         setNpsAlerts(alerts);
       } else {
         setNpsAlerts([]);
       }
 
-      setAvailableHikes({
-        parsed,
-        radius: radius || [],
-        overpass: overpass || [],
-      });
     } catch (err) {
       console.error('Error fetching hikes:', err);
       setAvailableHikes({ parsed, radius: [], overpass: [] });

@@ -12,6 +12,59 @@ function getDriveLabel(distanceMiles) {
   return `~${minutes} min drive`;
 }
 
+function HikeCard({ hike, actionButton }) {
+  const nameElement = hike.allTrailsUrl ? (
+    <a
+      href={hike.allTrailsUrl}
+      target="_blank"
+      rel="noopener noreferrer"
+      onClick={e => e.stopPropagation()}
+      style={{ color: '#2d6a2d', fontWeight: 'bold', textDecoration: 'underline' }}
+    >
+      {hike.name}
+    </a>
+  ) : (
+    <strong>{hike.name}</strong>
+  );
+
+  return (
+    <div style={{
+      border: '1px solid #ccc',
+      padding: '10px 12px',
+      marginBottom: '8px',
+      borderRadius: '6px',
+      backgroundColor: '#fff',
+    }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+        <div style={{ flex: 1 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+            {nameElement}
+            {hike.allTrailsUrl && (
+              <span style={{ fontSize: '0.75em', color: '#888' }}>(AllTrails ↗)</span>
+            )}
+            {hike.offroadWarning && (
+              <span style={{ color: '#cc6600', fontSize: '0.8em' }}>⚠️ May require high clearance</span>
+            )}
+          </div>
+          <div style={{ fontSize: '0.85em', color: '#555', marginTop: '4px', display: 'flex', flexDirection: 'column', gap: '2px' }}>
+            <span>
+              <strong>Distance from campsite:</strong>{' '}
+              {hike.distFromCamp !== null ? getDriveLabel(hike.distFromCamp) : 'Unknown'}
+            </span>
+            <span>
+              <strong>Hike distance:</strong>{' '}
+              {hike.distanceMiles ? `${hike.distanceMiles} miles` : 'Unknown'}
+            </span>
+          </div>
+        </div>
+        <div style={{ paddingLeft: '12px', flexShrink: 0 }}>
+          {actionButton}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function HikeSelector({
   allAvailableHikes,
   preferredHikes,
@@ -35,7 +88,6 @@ export default function HikeSelector({
     return preferredHikes.some(p => p.name === (hike.name || hike.FacilityName));
   }
 
-  // Normalize, attach distance, filter out already preferred
   const hikesWithDistance = allAvailableHikes
     .map(hike => {
       const name = hike.name || hike.FacilityName;
@@ -45,12 +97,10 @@ export default function HikeSelector({
     })
     .filter(hike => !isPreferred(hike));
 
-  // Filter by slider, keep unknowns
   const filtered = hikesWithDistance.filter(hike =>
     hike.driveMinutes === null || hike.driveMinutes <= maxDriveMinutes
   );
 
-  // Sort closest first, unknowns last
   const sorted = [...filtered].sort((a, b) => {
     if (a.driveMinutes === null && b.driveMinutes === null) return 0;
     if (a.driveMinutes === null) return 1;
@@ -58,53 +108,46 @@ export default function HikeSelector({
     return a.driveMinutes - b.driveMinutes;
   });
 
+  // Attach distance info to preferred hikes for the full card display
+  const preferredWithDistance = preferredHikes.map(hike => {
+    const distFromCamp = getDistanceFromCamp(hike);
+    const driveMinutes = distFromCamp !== null ? getDriveMinutes(distFromCamp) : null;
+    return { ...hike, distFromCamp, driveMinutes };
+  });
+
   return (
     <div style={{ marginTop: '24px' }}>
 
-      {/* Hike Preferences — tag style like meals */}
       <h3>Hike Preferences</h3>
-      {preferredHikes.length === 0 ? (
+      {preferredWithDistance.length === 0 ? (
         <p style={{ color: '#888', fontSize: '0.9em' }}>
-          No hikes selected yet. Click a hike below to add it.
+          No hikes selected yet. Click + on a hike below to add it.
         </p>
       ) : (
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '16px' }}>
-          {preferredHikes.map(hike => (
-            <span
-              key={hike.name}
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '6px',
-                backgroundColor: '#e8f4e8',
-                border: '1px solid #a8d5a8',
-                borderRadius: '20px',
-                padding: '4px 12px',
-                fontSize: '0.9em',
-              }}
-            >
-              {hike.name}
+        preferredWithDistance.map(hike => (
+          <HikeCard
+            key={hike.name}
+            hike={hike}
+            actionButton={
               <button
                 onClick={() => onRemoveHike(hike)}
                 style={{
                   background: 'none',
                   border: 'none',
                   cursor: 'pointer',
-                  fontSize: '0.9em',
-                  padding: '0',
-                  lineHeight: 1,
+                  fontSize: '1em',
                   color: '#555',
+                  padding: '0',
                 }}
               >
                 ✕
               </button>
-            </span>
-          ))}
-        </div>
+            }
+          />
+        ))
       )}
 
-      {/* Nearby Hikes pool */}
-      <h3>Nearby Hikes</h3>
+      <h3 style={{ marginTop: '24px' }}>Nearby Hikes</h3>
       <div style={{ marginBottom: '16px' }}>
         <label style={{ display: 'block', marginBottom: '4px', fontSize: '0.9em' }}>
           Max drive time from camp: <strong>{maxDriveMinutes} min</strong>
@@ -124,42 +167,31 @@ export default function HikeSelector({
         <p style={{ color: '#888' }}>No hikes found within {maxDriveMinutes} minutes of camp.</p>
       ) : (
         sorted.map((hike, index) => (
-          <div
+          <HikeCard
             key={`${hike.source}-${hike.name}-${index}`}
-            onClick={() => onAddHike(hike)}
-            style={{
-              border: '1px solid #ccc',
-              padding: '10px 12px',
-              marginBottom: '8px',
-              borderRadius: '6px',
-              backgroundColor: '#fff',
-              cursor: 'pointer',
-            }}
-            onMouseEnter={e => e.currentTarget.style.backgroundColor = '#f5f5f5'}
-            onMouseLeave={e => e.currentTarget.style.backgroundColor = '#fff'}
-          >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div>
-                <strong>{hike.name}</strong>
-                {hike.offroadWarning && (
-                  <span style={{ marginLeft: '8px', color: '#cc6600', fontSize: '0.8em' }}>
-                    ⚠️ May require high clearance
-                  </span>
-                )}
-                <div style={{ fontSize: '0.85em', color: '#555', marginTop: '4px', display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                  <span>
-                    <strong>Distance from campsite:</strong>{' '}
-                    {hike.distFromCamp !== null ? getDriveLabel(hike.distFromCamp) : 'Unknown'}
-                  </span>
-                  <span>
-                    <strong>Hike distance:</strong>{' '}
-                    {hike.distanceMiles ? `${hike.distanceMiles} miles` : 'Unknown'}
-                  </span>
-                </div>
-              </div>
-              <span style={{ fontSize: '1.2em', color: '#aaa', paddingLeft: '12px' }}>+</span>
-            </div>
-          </div>
+            hike={hike}
+            actionButton={
+              <button
+                onClick={() => onAddHike(hike)}
+                style={{
+                  background: 'none',
+                  border: '1px solid #aaa',
+                  borderRadius: '50%',
+                  cursor: 'pointer',
+                  fontSize: '1.2em',
+                  width: '28px',
+                  height: '28px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: '#333',
+                  padding: '0',
+                }}
+              >
+                +
+              </button>
+            }
+          />
         ))
       )}
     </div>

@@ -1,14 +1,5 @@
-const BASE_URL = 'http://localhost:3001/api';
 const OVERPASS_URL = 'https://overpass-api.de/api/interpreter';
 
-export async function fetchHikesNearCampground(lat, lon) {
-  const radiusInMiles = 40;
-  const response = await fetch(
-    `${BASE_URL}/hikes?lat=${lat}&lon=${lon}&radius=${radiusInMiles}`
-  );
-  const data = await response.json();
-  return data;
-}
 
 export async function fetchHikesFromOverpass(lat, lon, radiusMiles = 25) {
   const radiusMeters = radiusMiles * 1609.34;
@@ -16,13 +7,14 @@ export async function fetchHikesFromOverpass(lat, lon, radiusMiles = 25) {
   const query = `
     [out:json][timeout:25];
     (
-      way["highway"="path"]["name"](around:${radiusMeters},${lat},${lon});
-      way["highway"="footway"]["name"](around:${radiusMeters},${lat},${lon});
-      way["route"="hiking"](around:${radiusMeters},${lat},${lon});
-      relation["route"="hiking"](around:${radiusMeters},${lat},${lon});
+        way["highway"="path"]["name"](around:${radiusMeters},${lat},${lon});
+        way["highway"="footway"]["name"](around:${radiusMeters},${lat},${lon});
+        way["highway"="track"]["name"](around:${radiusMeters},${lat},${lon});
+        way["route"="hiking"](around:${radiusMeters},${lat},${lon});
+        relation["route"="hiking"](around:${radiusMeters},${lat},${lon});
     );
-    out center;
-  `;
+    out center tags;
+    `;
 
   const response = await fetch(OVERPASS_URL, {
         method: 'POST',
@@ -42,12 +34,17 @@ export async function fetchHikesFromOverpass(lat, lon, radiusMiles = 25) {
     })
     .map(el => ({
         name: el.tags.name,
-        distanceMiles: el.tags.distance ? parseFloat(el.tags.distance) : null,
+        distanceMiles: el.tags.distance
+            ? parseFloat(el.tags.distance) * 0.621371  // OSM distance is in km
+            : el.tags.length
+            ? parseFloat(el.tags.length) * 0.621371
+            : null,
         surface: el.tags.surface || null,
-        difficulty: el.tags.sac_scale || null,
-        FacilityLatitude: el.center?.lat || null,
-        FacilityLongitude: el.center?.lon || null,
+        difficulty: el.tags.sac_scale || el.tags.difficulty || null,
+        FacilityLatitude: el.center?.lat || el.lat || null,
+        FacilityLongitude: el.center?.lon || el.lon || null,
         offroadWarning: false,
         source: 'overpass',
-    }));
+        allTrailsUrl: `https://www.alltrails.com/search?q=${encodeURIComponent(el.tags.name)}`,
+        }));
 }
