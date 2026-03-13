@@ -1,12 +1,30 @@
-import './App.css';
+import { useState } from 'react';
+import { GoogleOAuthProvider } from '@react-oauth/google';
+import SplashPage from './pages/SplashPage';
 import HomePage from './pages/HomePage';
+import './App.css';
+
+// Replace with your actual Google OAuth Client ID from Google Cloud Console
+const GOOGLE_CLIENT_ID = process.env.REACT_APP_GOOGLE_CLIENT_ID || 'YOUR_CLIENT_ID_HERE';
 
 function App() {
+  const [authToken, setAuthToken] = useState(null);
+
+  function handleAuthSuccess(tokenResponse) {
+    setAuthToken(tokenResponse);
+  }
+
   return (
-    <div className="App">
-      <h1>Happy Camper</h1>
-      <HomePage />
-    </div>
+    <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
+      {authToken ? (
+        <div className="App">
+          <h1>Happy Camper</h1>
+          <HomePage authToken={authToken} />
+        </div>
+      ) : (
+        <SplashPage onAuthSuccess={handleAuthSuccess} />
+      )}
+    </GoogleOAuthProvider>
   );
 }
 
