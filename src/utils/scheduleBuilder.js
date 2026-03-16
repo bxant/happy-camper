@@ -1,8 +1,8 @@
 import { format, addDays, differenceInCalendarDays } from 'date-fns';
 
 export function buildDaySkeleton({ startDate, endDate, arrivalTime }) {
-  const start = new Date(startDate);
-  const end = new Date(endDate);
+  const start = new Date(startDate + 'T00:00:00');
+  const end = new Date(endDate + 'T00:00:00');
   const totalDays = differenceInCalendarDays(end, start) + 1;
   const days = [];
 
@@ -31,11 +31,3 @@ export function buildDaySkeleton({ startDate, endDate, arrivalTime }) {
 
   return days;
 }
-
-// TEMP TEST — delete after confirming
-const test = buildDaySkeleton({
-  startDate: '2026-06-07',
-  endDate: '2026-06-10',
-  arrivalTime: '14:00',
-});
-console.log('Day skeleton:', test);
