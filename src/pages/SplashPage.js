@@ -59,6 +59,9 @@ function SplashPage({ onAuthSuccess }) {
           We'll ask for access to Google Sheets and Drive<br />
           to create your trip itinerary — nothing else.
         </p>
+        <button className="splash-guest-btn" onClick={() => onAuthSuccess(null)}>
+          Explore as Guest
+        </button>
       </div>
 
       <div className="splash-footer">

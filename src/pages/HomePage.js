@@ -1,12 +1,13 @@
-import { useState } from 'react';
-import { searchCampgrounds } from '../services/recreationApi';
-import MealInput from '../components/MealInput';
+import { useState, useRef } from 'react';
 import { fetchHikesFromOverpass } from '../services/hikingApi';
-import { useRef } from 'react';
 import { parseTrailsFromDescription } from '../utils/descriptionParser';
-import HikeSelector from '../components/HikeSelector';
-import CampgroundDetail from '../components/CampgroundDetail';
 import { fetchNPSAlerts, getParkCodeForCampground } from '../services/npsApi';
+import StepReservation from '../components/steps/StepReservation';
+import StepTripDetails from '../components/steps/StepTripDetails';
+import StepTrails from '../components/steps/StepTrails';
+import StepMeals from '../components/steps/StepMeals';
+import StepGenerate from '../components/steps/StepGenerate';
+import '../components/steps/Steps.css';
 
 function HomePage() {
   const [startDate, setStartDate] = useState('');
@@ -30,6 +31,11 @@ function HomePage() {
   const [preferredHikes, setPreferredHikes] = useState([]);
   const [availableHikes, setAvailableHikes] = useState([]);
   const [npsAlerts, setNpsAlerts] = useState([]);
+  const [currentStep, setCurrentStep] = useState(1);
+  const [departureTime, setDepartureTime] = useState('11:00');
+  const [hikesPerDay, setHikesPerDay] = useState({});
+  const [status, setStatus] = useState('idle');
+  const [spreadsheetUrl, setSpreadsheetUrl] = useState(null);
 
   const searchTimeoutRef = useRef(null);
 
@@ -49,32 +55,7 @@ function HomePage() {
     setEndDate(event.target.value);
   }
 
-  async function handleCampgroundSearch(event) {
-    const value = event.target.value;
-    setCampgroundSearch(value);
-    setError(null);
-
-    if (searchTimeoutRef.current) {
-      clearTimeout(searchTimeoutRef.current);
-    }
-
-    if (value.length > 2) {
-      searchTimeoutRef.current = setTimeout(async () => {
-        setIsLoading(true);
-        try {
-          const results = await searchCampgrounds(value);
-          setCampgroundResults(results);
-        } catch (err) {
-          setError('Unable to search campgrounds. Please try again.');
-          setCampgroundResults([]);
-        } finally {
-          setIsLoading(false);
-        }
-      }, 500);
-    } else {
-      setCampgroundResults([]);
-    }
-  }
+  
 
   async function handleCampgroundSelect(campground) {
     console.log('campground object:', campground);
@@ -187,163 +168,100 @@ function HomePage() {
     })();
 
   return (
-    <div className="home-page">
-
-      <label>Arrival Date</label>
-      <input
-        type="date"
-        value={startDate}
-        onChange={handleStartDateChange}
+  <div className="home-page">
+    {currentStep === 1 && (
+      <StepReservation
+        onConfirm={(hasReservation) => {
+          if (hasReservation) {
+            setCurrentStep(2);
+          } else {
+            window.open('https://www.recreation.gov', '_blank');
+          }
+        }}
       />
+    )}
 
-      <label>Departure Date</label>
-      <input
-        type="date"
-        value={endDate}
-        min={startDate || undefined}
-        onChange={handleEndDateChange}
-        disabled={!startDate}
+    {currentStep === 2 && (
+      <StepTripDetails
+        selectedCampground={selectedCampground}
+        npsAlerts={npsAlerts}
+        startDate={startDate}
+        endDate={endDate}
+        arrivalTime={arrivalTime}
+        departureTime={departureTime}
+        wakeUpTime={wakeUpTime}
+        bedTime={bedTime}
+        hikeOnArrivalDay={hikeOnArrivalDay}
+        onCampgroundSelect={handleCampgroundSelect}
+        onDatesChange={(from, to) => {
+          setStartDate(from);
+          setEndDate(to);
+        }}
+        onArrivalTimeChange={setArrivalTime}
+        onDepartureTimeChange={setDepartureTime}
+        onWakeUpTimeChange={setWakeUpTime}
+        onBedTimeChange={setBedTime}
+        onHikeOnArrivalDayChange={setHikeOnArrivalDay}
+        onContinue={() => setCurrentStep(3)}
       />
+    )}
 
-      {numberOfDays > 0 && (
-        <p style={{ fontSize: '0.85em', color: '#555', margin: '4px 0 8px' }}>
-          {numberOfDays} night{numberOfDays !== 1 ? 's' : ''}
-        </p>
-      )}
-
-      <label>Hiking Comfort Level</label>
-      <select value={hikingLevel} onChange={handleHikingLevelChange}>
-        <option value="beginner">Beginner (0-3 miles)</option>
-        <option value="intermediate">Intermediate (3-6 miles)</option>
-        <option value="advanced">Advanced (6-10 miles)</option>
-        <option value="pro">Absolute Pro (10+ miles)</option>
-      </select>
-
-      <label>Expected Arrival Time (Day 1)</label>
-      <input
-        type="time"
-        value={arrivalTime}
-        onChange={handleArrivalTimeChange}
+    {currentStep === 3 && (
+      <StepTrails
+        allAvailableHikes={mergedHikes}
+        preferredHikes={preferredHikes}
+        startDate={startDate}
+        endDate={endDate}
+        hikeOnArrivalDay={hikeOnArrivalDay}
+        onAddHike={handleAddHike}
+        onRemoveHike={handleRemoveHike}
+        hikesPerDay={hikesPerDay}
+        onHikesPerDayChange={(dayIndex, count) =>
+          setHikesPerDay(prev => ({ ...prev, [dayIndex]: count }))
+        }
+        campLat={selectedCampground?.FacilityLatitude}
+        campLon={selectedCampground?.FacilityLongitude}
+        onContinue={() => setCurrentStep(4)}
+        onBack={() => setCurrentStep(2)}
       />
+    )}
 
-      <label>Expected Wake Up Time</label>
-      <input
-        type="time"
-        value={wakeUpTime}
-        onChange={handleWakeUpTimeChange}
-      />
-
-      <label>Expected Bedtime</label>
-      <input
-        type="time"
-        value={bedTime}
-        onChange={handleBedTimeChange}
-      />
-
-      <label>
-        <input
-          type="checkbox"
-          checked={wantsMorningHikes}
-          onChange={(e) => setWantsMorningHikes(e.target.checked)}
-        />
-        I would like morning hikes recommended
-      </label>
-
-      {wantsMorningHikes && (
-        <>
-          <label>Number of Morning Hike Days</label>
-          <small>Morning hikes will not be scheduled on arrival or departure day.</small>
-          <input
-            type="number"
-            min={0}
-            max={numberOfDays - 2}
-            value={morningHikeDays}
-            onChange={handleMorningHikeDaysChange}
-          />
-        </>
-      )}
-
-      <label>
-        <input
-          type="checkbox"
-          checked={hikeOnArrivalDay}
-          onChange={(e) => setHikeOnArrivalDay(e.target.checked)}
-        />
-        I want to hike on my arrival day
-      </label>
-
-      <label>Search Campground</label>
-      <input
-        type="text"
-        value={campgroundSearch}
-        onChange={handleCampgroundSearch}
-        placeholder="Search for a campground"
-      />
-      {campgroundResults.length > 0 && (
-        <ul>
-          {campgroundResults.map((campground) => (
-            <li
-              key={campground.FacilityID}
-              onClick={() => handleCampgroundSelect(campground)}
-            >
-              {campground.FacilityName}
-            </li>
-          ))}
-        </ul>
-      )}
-      {selectedCampground && (
-        <CampgroundDetail
-          campground={selectedCampground}
-          npsAlerts={npsAlerts}
-        />
-      )}
-
-      {isLoading && <p>Searching...</p>}
-      {error && <p style={{ color: 'red' }}>{error}</p>}
-
-      <h3>Meals</h3>
-      <MealInput
-        mealType="Breakfast"
-        meals={breakfastMeals}
+    {currentStep === 4 && (
+      <StepMeals
+        breakfastMeals={breakfastMeals}
+        lunchMeals={lunchMeals}
+        dinnerMeals={dinnerMeals}
         onAddMeal={handleAddMeal}
         onRemoveMeal={handleRemoveMeal}
+        onContinue={() => setCurrentStep(5)}
+        onBack={() => setCurrentStep(3)}
       />
-      <MealInput
-        mealType="Lunch"
-        meals={lunchMeals}
-        onAddMeal={handleAddMeal}
-        onRemoveMeal={handleRemoveMeal}
+    )}
+
+    {currentStep === 5 && (
+      <StepGenerate
+        status={status}
+        spreadsheetUrl={spreadsheetUrl}
+        campgroundName={selectedCampground?.FacilityName}
+        onRetry={() => handleSubmit()}
+        onDownloadJSON={() => {
+          const blob = new Blob(
+            [JSON.stringify({ schedule: mergedHikes, campground: selectedCampground }, null, 2)],
+            { type: 'application/json' }
+          );
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = 'happy-camper-itinerary.json';
+          a.click();
+          URL.revokeObjectURL(url);
+        }}
+        schedule={mergedHikes}
       />
-      <MealInput
-        mealType="Dinner"
-        meals={dinnerMeals}
-        onAddMeal={handleAddMeal}
-        onRemoveMeal={handleRemoveMeal}
-      />
+    )}
+  </div>
+);
 
-      {validationErrors.length > 0 && (
-        <div style={{ color: 'red' }}>
-          {validationErrors.map((err, index) => (
-            <p key={index}>{err}</p>
-          ))}
-        </div>
-      )}
-
-      {selectedCampground && (
-        <HikeSelector
-          allAvailableHikes={mergedHikes}
-          preferredHikes={preferredHikes}
-          onAddHike={handleAddHike}
-          onRemoveHike={handleRemoveHike}
-          campLat={selectedCampground.FacilityLatitude}
-          campLon={selectedCampground.FacilityLongitude}
-        />
-      )}
-
-      <button onClick={handleSubmit}>Plan My Trip</button>
-
-    </div>
-  );
 }
 
 export default HomePage;

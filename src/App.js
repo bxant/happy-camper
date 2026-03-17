@@ -50,7 +50,7 @@ function App() {
   const [authToken, setAuthToken] = useState(null);
 
   function handleAuthSuccess(tokenResponse) {
-    setAuthToken(tokenResponse);
+    setAuthToken(tokenResponse === null ? 'guest' : tokenResponse);
   }
 
   return (
