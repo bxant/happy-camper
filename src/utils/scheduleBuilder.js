@@ -52,20 +52,27 @@ export function assignMealsToDays(days, breakfastPool, lunchPool, dinnerPool) {
 }
 
 export function assignHikesToDays(days, preferredHikes, hikesPerDay, hikeOnArrivalDay, allAvailableHikes) {
-  const hikePool = [...preferredHikes];
+  // Build the full pool — preferred first, then remaining by drive time
+  const preferredNames = new Set(preferredHikes.map(h => h.name));
+  const remainingPool = allAvailableHikes
+    .filter(h => !preferredNames.has(h.name))
+    .sort((a, b) => (a.driveMinutes || 999) - (b.driveMinutes || 999));
+
+  const fullPool = [...preferredHikes, ...remainingPool];
   let hikeIndex = 0;
+  const scheduledHikeNames = new Set();
 
   const updatedDays = days.map(day => {
     if (day.dayType === 'departure') return day;
-
     if (day.dayType === 'arrival' && !hikeOnArrivalDay) return day;
 
-    const count = hikesPerDay[day.index] || 1;
+    const count = Math.min(hikesPerDay[day.index] || 1, 3);
     const assignedHikes = [];
 
     for (let i = 0; i < count; i++) {
-      if (hikeIndex < hikePool.length) {
-        assignedHikes.push(hikePool[hikeIndex]);
+      if (hikeIndex < fullPool.length) {
+        assignedHikes.push(fullPool[hikeIndex]);
+        scheduledHikeNames.add(fullPool[hikeIndex].name);
         hikeIndex++;
       }
     }
@@ -73,14 +80,19 @@ export function assignHikesToDays(days, preferredHikes, hikesPerDay, hikeOnArriv
     return { ...day, hikes: assignedHikes };
   });
 
-  // Honorable mentions = all preferred hikes + 2 closest from remaining pool
-  const usedHikeNames = new Set(preferredHikes.map(h => h.name));
-  const remaining = allAvailableHikes
-    .filter(h => !usedHikeNames.has(h.name))
-    .sort((a, b) => (a.driveMinutes || 999) - (b.driveMinutes || 999))
-    .slice(0, 2);
+  // Calculate total hikes needed across all days
+  const totalHikesNeeded = days.reduce((sum, day) => {
+    if (day.dayType === 'departure') return sum;
+    if (day.dayType === 'arrival' && !hikeOnArrivalDay) return sum;
+    return sum + Math.min(hikesPerDay[day.index] || 1, 3);
+  }, 0);
 
-  const honorableMentions = [...preferredHikes, ...remaining];
+  // Rebuild honorable mentions — hikes NOT in schedule, sorted by drive time
+  // Total = hikes needed + 2 for flexibility
+  const honorableMentions = allAvailableHikes
+    .filter(h => !scheduledHikeNames.has(h.name))
+    .sort((a, b) => (a.driveMinutes || 999) - (b.driveMinutes || 999))
+    .slice(0, totalHikesNeeded + 2);
 
   return { updatedDays, honorableMentions };
 }
@@ -99,6 +111,12 @@ function minutesToTimeLabel(totalMinutes) {
   return `${displayHour}:${displayMinutes} ${period}`;
 }
 
+function timeToRowOffset(totalMinutes) {
+  const startMinutes = 0; // midnight anchor — supports any start time
+  const diff = (totalMinutes - startMinutes + 24 * 60) % (24 * 60);
+  return Math.round(diff / 30);
+}
+
 function roundUpToHalfHour(minutes) {
   return Math.ceil(minutes / 30) * 30;
 }
@@ -110,6 +128,7 @@ function buildSlots(events) {
   for (const event of events.schedule) {
     slots.push({
       time: minutesToTimeLabel(cursor),
+      rowOffset: timeToRowOffset(cursor),
       label: event.label,
     });
     cursor += event.durationMinutes;
@@ -135,7 +154,7 @@ export function buildTimeSlots(days, wakeUpTime, bedTime) {
           const driveTime = roundUpToHalfHour(hike.driveMinutes || 30);
           schedule.push({ label: `Drive to ${hike.name}`, durationMinutes: driveTime });
           schedule.push({ label: `Hike — ${hike.name}`, durationMinutes: 120 });
-          schedule.push({ label: `Drive back to camp`, durationMinutes: driveTime });
+          schedule.push({ label: 'Drive back to camp', durationMinutes: driveTime });
         }
         schedule.push({ label: `Dinner — ${day.meals.dinner}`, durationMinutes: 60 });
         schedule.push({ label: 'Campfire & Rest', durationMinutes: 60 });
@@ -173,7 +192,7 @@ export function buildTimeSlots(days, wakeUpTime, bedTime) {
     schedule.push({ label: 'Wake Up', durationMinutes: 30 });
     schedule.push({ label: `Breakfast — ${day.meals.breakfast}`, durationMinutes: 60 });
 
-    const [firstHike, secondHike] = day.hikes;
+    const [firstHike, secondHike, thirdHike] = day.hikes;
 
     if (firstHike) {
       const driveTime = roundUpToHalfHour(firstHike.driveMinutes || 30);
@@ -191,6 +210,7 @@ export function buildTimeSlots(days, wakeUpTime, bedTime) {
       schedule.push({ label: 'Drive back to camp', durationMinutes: driveTime });
     }
 
+    // Free time calculated before dinner
     const freeTimeStart = schedule.reduce((sum, e) => sum + e.durationMinutes, wakeMinutes);
     const freeTimeAvailable = bedMinutes - freeTimeStart - 120;
 
@@ -199,6 +219,12 @@ export function buildTimeSlots(days, wakeUpTime, bedTime) {
     }
 
     schedule.push({ label: `Dinner — ${day.meals.dinner}`, durationMinutes: 60 });
+
+    // Third hike is an evening walk — no drive time, no duration math
+    if (thirdHike) {
+      schedule.push({ label: `Evening Walk — ${thirdHike.name}`, durationMinutes: 60 });
+    }
+
     schedule.push({ label: 'Campfire & Rest', durationMinutes: 60 });
     schedule.push({ label: 'Sleep', durationMinutes: 0 });
 

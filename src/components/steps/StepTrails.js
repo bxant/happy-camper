@@ -31,7 +31,6 @@ function StepTrails({
 
   const hikeCount = preferredHikes.length;
 
-  // Sub-screen: Explore Trails
   if (showTrails) {
     return (
       <div className="step-container">
@@ -43,6 +42,12 @@ function StepTrails({
         <p className="step-subtitle">
           Select the hikes you want included in your itinerary.
         </p>
+
+        <div className="trails-disclaimer">
+          ⚠️ Hike durations are estimated at 2 hours and drive times are approximate.
+          Trails are scheduled based on your preferences, not trail length or difficulty.
+          We recommend researching each trail before your trip.
+        </div>
 
         <HikeSelector
           allAvailableHikes={allAvailableHikes}
@@ -63,7 +68,6 @@ function StepTrails({
     );
   }
 
-  // Main Step 3 screen
   return (
     <div className="step-container">
       <h2 className="step-title">Trail Preferences</h2>
@@ -71,13 +75,19 @@ function StepTrails({
         Choose how many hikes per day and explore trails in the area.
       </p>
 
-      {/* Per day hike count */}
       {fullDays.length > 0 && (
         <div className="step-field">
           <label className="step-label">Hikes per day</label>
           <p className="step-hint">
-            Choose how many hikes you'd like scheduled per day.
+            Choose how many hikes you'd like scheduled per day. Max 3 per day.
           </p>
+
+          <div className="trails-safety-notice">
+            🏕️ We cap hikes at 3 per day for your safety. The 3rd hike is scheduled
+            as an evening walk after dinner. If you're feeling ambitious, feel free
+            to edit your itinerary sheet when it's complete.
+          </div>
+
           <div className="hikes-per-day">
             {fullDays.map((dayIndex) => (
               <div key={dayIndex} className="hikes-per-day-row">
@@ -101,7 +111,7 @@ function StepTrails({
                     className="hike-count-btn"
                     onClick={() => onHikesPerDayChange(
                       dayIndex,
-                      Math.min(2, (hikesPerDay[dayIndex] || 1) + 1)
+                      Math.min(3, (hikesPerDay[dayIndex] || 1) + 1)
                     )}
                   >
                     +
@@ -113,7 +123,6 @@ function StepTrails({
         </div>
       )}
 
-      {/* Explore trails button */}
       <button
         className={`explore-trails-btn ${hikeCount > 0 ? 'has-hikes' : ''}`}
         onClick={() => setShowTrails(true)}
@@ -122,6 +131,11 @@ function StepTrails({
           ? `Hikes Selected: ${hikeCount} ✓`
           : '🧭 Explore regional trails'}
       </button>
+
+      <p className="step-hint" style={{ textAlign: 'center' }}>
+        ⚠️ Hike durations and drive times are estimates only.
+        Always research trails before your trip.
+      </p>
 
       <div className="step-nav">
         <button className="step-back-btn" onClick={onBack}>
