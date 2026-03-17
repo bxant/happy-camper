@@ -12,6 +12,7 @@ function StepGenerate({ status, spreadsheetUrl, campgroundName, onRetry, onDownl
     const currentIndex = order.indexOf(status);
     const stepIndex = order.indexOf(stepKey);
 
+    if (status === 'success') return 'done';
     if (status === 'error') return 'error';
     if (stepIndex < currentIndex) return 'done';
     if (stepIndex === currentIndex) return 'active';
