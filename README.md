@@ -134,6 +134,6 @@ happy-camper/
 
 ## Author
 
-**Bryant Flores** — [github.com/bx-machina](https://github.com/bx-machina) · [LinkedIn](https://www.linkedin.com/in/bryant-flores-9510b61bb/)
+**Bryant Flores** — [github.com/bxant](https://github.com/bxant) · [LinkedIn](https://www.linkedin.com/in/bryant-flores-9510b61bb/)
 
 Built for personal use because planning camping trips in spreadsheets by hand is its own kind of suffering.
