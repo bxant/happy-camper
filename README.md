@@ -1,70 +1,139 @@
-# Getting Started with Create React App
+# 🏕️ Happy Camper
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+A React-based camping trip planner that takes the logistics out of the outdoors. Search parks and trails via the Recreation.gov API, build a day-by-day trip schedule, plan meals, and export everything to a formatted Google Sheet — all in one place.
 
-## Available Scripts
+---
 
-In the project directory, you can run:
+## Features
 
-### `npm start`
+- **Park & Trail Search** — Search campgrounds and trails using the Recreation.gov API, with park details pulled from the NPS API
+- **Trip Scheduling** — Dynamic day-by-day itinerary builder with configurable start times and activity blocks
+- **Meal Planning** — Add and organize meals across your trip days
+- **Google Sheets Export** — Generate a formatted trip sheet directly to your Google Drive with a single click
+- **Google OAuth** — Secure sign-in via Google to authorize Sheets access
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
+---
 
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
+## Tech Stack
 
-### `npm test`
+| Layer | Technology |
+|---|---|
+| Frontend | React (Create React App) |
+| Backend | Node.js / Express |
+| Auth | Google OAuth 2.0 |
+| APIs | Recreation.gov, NPS, Google Sheets API, Overpass (trail data) |
+| Export | Google Sheets API v4 |
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+---
 
-### `npm run build`
+## Getting Started
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+### Prerequisites
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+- Node.js v16+
+- A [Recreation.gov API key](https://ridb.recreation.gov/docs)
+- A [Google Cloud project](https://console.cloud.google.com/) with the following enabled:
+  - Google Sheets API
+  - Google OAuth 2.0 credentials (Web application type)
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+### 1. Clone the repo
 
-### `npm run eject`
+```bash
+git clone https://github.com/bx-machina/happy-camper.git
+cd happy-camper
+```
 
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
+### 2. Install dependencies
 
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+```bash
+# Install frontend dependencies
+npm install
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
+# Install backend dependencies
+cd server
+npm install
+cd ..
+```
 
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
+### 3. Configure environment variables
 
-## Learn More
+Create a `.env` file in the project root:
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
+```env
+REACT_APP_RIDB_API_KEY=your_recreation_gov_api_key
+REACT_APP_NPS_API_KEY=your_nps_api_key
+REACT_APP_GOOGLE_CLIENT_ID=your_google_oauth_client_id
+```
 
-To learn React, check out the [React documentation](https://reactjs.org/).
+Create a `.env` file in the `/server` directory:
 
-### Code Splitting
+```env
+GOOGLE_CLIENT_ID=your_google_oauth_client_id
+GOOGLE_CLIENT_SECRET=your_google_oauth_client_secret
+REDIRECT_URI=http://localhost:3001/auth/google/callback
+```
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
+> ⚠️ Never commit `.env` files. Both are included in `.gitignore`.
 
-### Analyzing the Bundle Size
+### 4. Run the app
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
+In two separate terminals:
 
-### Making a Progressive Web App
+```bash
+# Terminal 1 — start the backend
+cd server
+node index.js
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
+# Terminal 2 — start the frontend
+npm start
+```
 
-### Advanced Configuration
+The app will be available at `http://localhost:3000`.
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
+---
 
-### Deployment
+## Google OAuth Setup
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
+1. Go to [Google Cloud Console](https://console.cloud.google.com/)
+2. Create a new project (or use an existing one)
+3. Enable the **Google Sheets API** and **Google Drive API**
+4. Under **Credentials**, create an OAuth 2.0 Client ID
+   - Application type: **Web application**
+   - Authorized redirect URI: `http://localhost:3001/auth/google/callback`
+5. Copy the Client ID and Client Secret into your server `.env`
 
-### `npm run build` fails to minify
+---
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+## Project Structure
+
+```
+happy-camper/
+├── public/
+├── src/
+│   ├── components/        # React UI components
+│   ├── logic/             # Scheduling, sheet generation, trip logic
+│   ├── App.js
+│   └── index.js
+├── server/
+│   ├── index.js           # Express server + OAuth flow
+│   └── ...
+├── decisions.md           # Architecture and design decisions log
+└── README.md
+```
+
+---
+
+## Roadmap
+
+- [ ] Packing list generator based on trip length and activities
+- [ ] Weather forecast integration per trip day
+- [ ] Multi-trip saving and history
+- [ ] Mobile layout polish
+
+---
+
+## Author
+
+**Bryant Flores** — [github.com/bx-machina](https://github.com/bx-machina) · [LinkedIn](https://www.linkedin.com/in/bryant-flores-9510b61bb/)
+
+Built for personal use because planning camping trips in spreadsheets by hand is its own kind of suffering.
